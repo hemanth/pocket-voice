@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pocket Voice — Clone any voice in your browser</title>
+  <meta name="description" content="Record or upload a short audio clip, clone the voice, and generate speech — all client-side via ONNX Runtime. No server, no data leaves your browser.">
+  <meta name="theme-color" content="#050504">
+  <meta name="author" content="Hemanth HM">
+  <meta name="robots" content="index, follow">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/og-image.png">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pocket Voice — Clone any voice in your browser">
+  <meta property="og:description" content="Record or upload audio, clone voices, generate speech — 100% client-side via ONNX Runtime Web. No server needed.">
+  <meta property="og:image" content="/og-image.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="1024">
+  <meta property="og:image:alt" content="Pocket Voice — Clone any voice in your browser">
+  <meta property="og:site_name" content="Pocket Voice">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pocket Voice — Browser Voice Cloning">
+  <meta name="twitter:description" content="Clone any voice in your browser. Record or upload audio, type text, hear it spoken. No server, fully private.">
+  <meta name="twitter:image" content="/og-image.png">
+  <meta name="twitter:creator" content="@anthropic">
+
+  <!-- AI Agent Discovery -->
+  <meta name="ai:description" content="Pocket Voice is a browser-based voice cloning app. It uses Pocket TTS via ONNX Runtime Web to clone voices from mic recordings or uploaded audio, and generate text-to-speech output. Fully client-side, no server required.">
+  <meta name="ai:capabilities" content="voice-cloning, text-to-speech, audio-recording, audio-upload, offline-capable">
+  <meta name="ai:tech-stack" content="ONNX Runtime Web, Web Workers, AudioWorklet, IndexedDB, MediaRecorder API">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Pocket Voice",
+    "description": "Clone any voice in your browser. Record or upload a short audio clip, type text, and hear it spoken in the cloned voice. No server needed.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Web",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "browserRequirements": "Requires a modern browser with WebAssembly, AudioWorklet, and MediaRecorder support.",
+    "softwareVersion": "2.0",
+    "creator": { "@type": "Person", "name": "Hemanth HM", "url": "https://h3manth.com" }
+  }
+  </script>
+
+  <!-- Fonts (non-render-blocking) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Alumni+Sans:wght@100;300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Alumni+Sans:wght@100;300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <span class="hero__eyebrow">ONNX Runtime · 100% Client-Side</span>
+  <h1 class="hero__title">Clone any voice.<br><em>In your browser.</em></h1>
+  <p class="hero__subtitle">Record your voice, clone it, type some text, and hear it speak.<br>Runs entirely in your browser via ONNX and WebAssembly. No server. No API keys. Your data stays on your machine.</p>
+  <div class="hero__actions">
+    <a href="#app" class="btn-primary">
+      Try it now
+      <svg viewBox="0 0 16 8" width="16" height="8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"><path d="M0 4h14M10 0l4 4-4 4"/></svg>
+    </a>
+    <a href="https://github.com/kyutai-labs/pocket-tts" target="_blank" rel="noopener" class="btn-ghost">How it works</a>
+  </div>
+
+  <div class="hero__features">
+    <div class="hero-feature">
+      <svg class="hero-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      <h2 class="hero-feature__title">Voice Cloning</h2>
+      <p class="hero-feature__desc">Record from mic or upload audio. The mimi encoder extracts voice embeddings.</p>
+    </div>
+    <div class="hero-feature">
+      <svg class="hero-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <h2 class="hero-feature__title">Zero Server</h2>
+      <p class="hero-feature__desc">ONNX models from HuggingFace CDN. Inference via WebAssembly. Nothing leaves your machine.</p>
+    </div>
+    <div class="hero-feature">
+      <svg class="hero-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <h2 class="hero-feature__title">Streaming Audio</h2>
+      <p class="hero-feature__desc">Hear audio as it generates via AudioWorklet. Save cloned voices and reuse anytime.</p>
+    </div>
+  </div>
+</section>
+
+<!-- App -->
+<main>
+<section class="app-section" id="app">
+  <div class="container">
+    <header class="app-section__header">
+      <h2 class="app-section__title">Voice Studio</h2>
+      <p class="app-section__sub">Clone a voice, select a preset, type text, generate.</p>
+    </header>
+
+    <div class="app-grid">
+      <!-- LEFT COLUMN: Voice Controls -->
+      <div>
+        <!-- Clone Panel -->
+        <div class="panel clone-panel">
+          <div class="clone__heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            Voice Clone
+          </div>
+          <p class="clone__sub">Record ~5s of speech or upload an audio clip to clone</p>
+
+          <div class="clone__actions">
+            <button class="clone-btn" id="btn-record">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+              <span id="record-label">Record</span>
+              <span class="rec-timer" id="rec-timer" hidden>0:00</span>
+            </button>
+            <button class="clone-btn" id="btn-upload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload
+            </button>
+            <input type="file" id="file-upload" accept="audio/*" hidden>
+          </div>
+          <p class="clone__status" id="clone-status"></p>
+
+          <!-- Saved Voices -->
+          <div class="saved-voices" id="saved-voices-section">
+            <div class="panel__label">My Voices</div>
+            <div id="saved-voices-list">
+              <p class="saved-empty" id="saved-empty">No saved voices yet. Clone a voice to save it.</p>
+            </div>
+          </div>
+
+          <!-- Voice Gallery -->
+          <div class="gallery">
+            <div class="panel__label">Built-in Voices</div>
+            <div class="gallery__grid" id="voice-gallery">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Language + Voice selectors -->
+        <div class="panel">
+          <div class="selectors-row">
+            <div>
+              <label class="field__label" for="language-select">Language</label>
+              <select class="field__select" id="language-select">
+                <option value="english_2026-04">English (2026)</option>
+                <option value="german">German</option>
+                <option value="italian">Italian</option>
+                <option value="portuguese">Portuguese</option>
+                <option value="spanish">Spanish</option>
+              </select>
+            </div>
+            <div>
+              <label class="field__label" for="voice-select">Active Voice</label>
+              <select class="field__select" id="voice-select">
+                <option value="">Loading…</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Text + Output -->
+      <div>
+        <!-- Text Input -->
+        <div class="panel">
+          <label class="panel__label" for="text-input">Text to Speak</label>
+          <textarea class="text-area" id="text-input" placeholder="Type or paste text to synthesize…"></textarea>
+          <div class="text-meta">
+            <span><span id="char-count">0</span> chars</span>
+          </div>
+          <div class="samples">
+            <button class="sample-pill" data-text="Hello, welcome to Pocket Voice. This is a demonstration of real-time voice cloning running entirely in your browser.">Demo greeting</button>
+            <button class="sample-pill" data-text="I completely understand how frustrating this must be. Let me take care of this right away.">Empathetic</button>
+            <button class="sample-pill" data-text="Wow, congratulations! That is absolutely fantastic news! I'm so thrilled for you!">Excited</button>
+            <button class="sample-pill" data-text="Great question. I'd be happy to walk you through this step by step.">Helpful guide</button>
+          </div>
+        </div>
+
+        <!-- Generate -->
+        <div class="panel" style="border:none; background:none; padding:0;">
+          <button class="btn-generate" id="btn-generate" disabled aria-label="Generate audio">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            <span class="btn-text">Generate Audio</span>
+            <div class="spinner"></div>
+          </button>
+          <button class="btn-stop" id="btn-stop">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            Stop
+          </button>
+        </div>
+
+        <!-- Output -->
+        <div class="panel">
+          <div class="output__header">
+            <span class="panel__label" style="margin-bottom:0">Audio Output</span>
+            <div class="status-indicator">
+              <span class="status-indicator__dot" id="status-dot"></span>
+              <span id="status-text">Idle</span>
+            </div>
+          </div>
+          <canvas class="waveform" id="waveform"></canvas>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric__val" id="stat-ttfb">—</div>
+              <div class="metric__key">TTFB (ms)</div>
+            </div>
+            <div class="metric">
+              <div class="metric__val metric__val--accent" id="stat-rtfx">—</div>
+              <div class="metric__key">RTFx</div>
+            </div>
+            <div class="metric">
+              <button class="btn-download" id="btn-download" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- Save Voice Modal -->
+<div class="save-modal" id="save-modal">
+  <div class="save-modal__card">
+    <h3 class="save-modal__title">Save cloned voice</h3>
+    <input class="save-modal__input" id="save-voice-name" type="text" placeholder="Voice name (e.g. My recording)" autofocus>
+    <div class="save-modal__actions">
+      <button class="btn-ghost" id="save-cancel" style="padding:0.5rem 1rem; font-size:0.78rem;">Cancel</button>
+      <button class="btn-primary" id="save-confirm" style="padding:0.5rem 1rem; font-size:0.78rem;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <p>Built with ❤️ by <a href="https://h3manth.com" target="_blank" rel="noopener">Hemanth HM</a> · Powered by <a href="https://github.com/kyutai-labs/pocket-tts" target="_blank" rel="noopener">Pocket TTS</a></p>
+    <p class="footer__warn">Do not use for voice cloning without consent, misinformation, fraud, or any harmful or illegal purpose.</p>
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
