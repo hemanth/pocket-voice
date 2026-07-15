@@ -238,8 +238,22 @@ class PocketVoice {
     this.el.btnUpload.disabled = true;
     this.setCloneStatus("Loading model… please wait", "");
 
-    this.worker = new Worker("./inference-worker.js?v=2.0.6");
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (isIOS && typeof MainThreadWorkerShim !== "undefined") {
+      // iOS Web Workers can't allocate enough memory for WASM compilation (~256MB limit).
+      // Run inference on the main thread instead (~1GB+ available).
+      console.log("iOS detected: using MainThreadWorkerShim");
+      this.worker = new MainThreadWorkerShim("./inference-worker.js");
+    } else {
+      this.worker = new Worker("./inference-worker.js?v=2.0.6");
+    }
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
+    // Flush any messages the worker code sent before onmessage was set
+    if (this.worker._flushPendingOutbound) {
+      this.worker._flushPendingOutbound();
+    }
     this.worker.onerror = (e) => {
       console.error("Worker crashed:", e);
       this.updateStatus("Worker failed to load. Try refreshing.", "error");
