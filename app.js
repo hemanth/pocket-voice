@@ -674,6 +674,8 @@ class PocketVoice {
 
     await this.ensureAudioContext();
     if (this.audioContext.state === "suspended") await this.audioContext.resume();
+    // Ensure AudioWorklet is fully loaded before first generation
+    await this.player.initPromise;
 
     this.isGenerating = true;
     this.generationStartTime = performance.now();
