@@ -4,8 +4,15 @@ console.log("Pocket TTS Worker Starting...");
 const ORT_VERSION = "1.18.0";
 const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 
-// Load local dependency at top level (importScripts is synchronous, local file is fast)
-importScripts("./sentencepiece.js?v=2.0.5");
+// sentencepiece.js is loaded lazily via ensureSentencepieceLoaded() to reduce
+// peak memory during ORT WASM compilation (critical for iOS memory limits).
+let sentencepieceLoaded = false;
+function ensureSentencepieceLoaded() {
+    if (sentencepieceLoaded) return;
+    console.log("Loading sentencepiece tokenizer library...");
+    importScripts("./sentencepiece.js?v=2.0.5");
+    sentencepieceLoaded = true;
+}
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
@@ -571,25 +578,44 @@ async function loadOrt() {
         return;
     }
 
+    const isIOSOrSafari = checkIsIOS() || checkIsSafari();
+
     postMessage({ type: "status", status: "Loading ONNX Runtime...", state: "loading" });
-    // Fetch ORT script and load via Blob URL — avoids top-level importScripts crash on CDN failure
-    // and works reliably in async contexts across all browsers
-    const ortUrl = `${ORT_CDN_BASE}ort.all.min.js`;
-    const response = await fetch(ortUrl);
-    if (!response.ok) throw new Error(`Failed to load ONNX Runtime from CDN (${response.status})`);
-    const scriptText = await response.text();
-    const blob = new Blob([scriptText], { type: "application/javascript" });
-    const blobUrl = URL.createObjectURL(blob);
+
+    // Use ort.min.js (540KB, WASM-only backend) instead of ort.all.min.js (1.1MB, all backends)
+    // to halve the JS parse memory overhead before WASM compilation.
+    const ortScript = isIOSOrSafari ? "ort.min.js" : "ort.all.min.js";
+    const ortUrl = `${ORT_CDN_BASE}${ortScript}`;
+
+    // Direct importScripts avoids the fetch→text→Blob→blobURL pipeline
+    // which held 3 copies of the script in memory simultaneously.
     try {
-        importScripts(blobUrl);
-    } finally {
-        URL.revokeObjectURL(blobUrl);
+        importScripts(ortUrl);
+    } catch (e) {
+        // Fallback: try fetch+blob approach if direct importScripts fails (e.g. CORS)
+        console.warn("Direct importScripts failed, trying fetch fallback:", e.message);
+        const response = await fetch(ortUrl);
+        if (!response.ok) throw new Error(`Failed to load ONNX Runtime from CDN (${response.status})`);
+        const scriptText = await response.text();
+        const blob = new Blob([scriptText], { type: "application/javascript" });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+            importScripts(blobUrl);
+        } finally {
+            URL.revokeObjectURL(blobUrl);
+        }
     }
+
     ort.env.wasm.wasmPaths = ORT_CDN_BASE;
-    if (checkIsIOS() || checkIsSafari()) {
-        console.log("iOS or Safari detected: disabling WebAssembly SIMD and forcing 1 thread to prevent stack/memory limits.");
+    // Disable ORT internal logging to reduce memory allocations
+    ort.env.logLevel = "error";
+
+    if (isIOSOrSafari) {
+        console.log("iOS/Safari: SIMD off, 1 thread, minimal memory footprint.");
         ort.env.wasm.simd = false;
         ort.env.wasm.numThreads = 1;
+        // Disable proxy worker — we're already in a worker, spawning another doubles overhead
+        ort.env.wasm.proxy = false;
     } else {
         ort.env.wasm.simd = true;
         ort.env.wasm.numThreads = self.crossOriginIsolated
@@ -716,6 +742,7 @@ async function loadBundle(language, { initialLoad = false } = {}) {
         throw new Error(`Failed to load tokenizer for ${language}`);
     }
     const tokenizerBuffer = await tokenizerResponse.arrayBuffer();
+    ensureSentencepieceLoaded();
     tokenizerProcessor = new self.SentencePieceProcessor();
     await tokenizerProcessor.loadFromArrayBuffer(tokenizerBuffer);
 

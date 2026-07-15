@@ -238,7 +238,7 @@ class PocketVoice {
     this.el.btnUpload.disabled = true;
     this.setCloneStatus("Loading model… please wait", "");
 
-    this.worker = new Worker("./inference-worker.js?v=2.0.5");
+    this.worker = new Worker("./inference-worker.js?v=2.0.6");
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
     this.worker.onerror = (e) => {
       console.error("Worker crashed:", e);
