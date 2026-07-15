@@ -409,10 +409,16 @@ body {
   transition: all var(--t-fast);
 }
 
-.clone-btn:hover {
+.clone-btn:hover:not(:disabled) {
   background: var(--bg-3);
   border-color: var(--border-hover);
   color: var(--text-0);
+}
+
+.clone-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .clone-btn svg { width: 16px; height: 16px; }

@@ -151,6 +151,11 @@ class PocketVoice {
 
     this.worker = new Worker("./inference-worker.js");
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
+    this.worker.onerror = (e) => {
+      console.error("Worker crashed:", e);
+      this.updateStatus("Worker failed to load. Try refreshing.", "error");
+      this.setCloneStatus("Model failed to load", "error");
+    };
     this.worker.postMessage({ type: "load" });
   }
 
@@ -235,6 +240,7 @@ class PocketVoice {
       case "error":
         console.error("Worker:", msg.error);
         this.updateStatus(`Error: ${msg.error}`, "error");
+        this.setCloneStatus(msg.error, "error");
         this.resetUI();
         break;
     }
@@ -687,6 +693,8 @@ class PocketVoice {
     this.el.btnGenerate.disabled = !this.isWorkerReady;
     this.el.btnGenerate.classList.remove("is-loading");
     this.el.btnStop.style.display = "none";
+    this.el.btnRecord.disabled = !this.isWorkerReady;
+    this.el.btnUpload.disabled = !this.isWorkerReady;
   }
 
   updateStatus(text, state) {
