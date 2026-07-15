@@ -554,7 +554,15 @@ async function loadOrt() {
         URL.revokeObjectURL(blobUrl);
     }
     ort.env.wasm.wasmPaths = ORT_CDN_BASE;
-    ort.env.wasm.simd = true;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isIOS || isSafari) {
+        console.log("iOS or Safari detected: disabling WebAssembly SIMD to prevent stack overflow.");
+        ort.env.wasm.simd = false;
+    } else {
+        ort.env.wasm.simd = true;
+    }
     ort.env.wasm.numThreads = self.crossOriginIsolated
         ? Math.min(navigator.hardwareConcurrency || 4, 8)
         : 1;
