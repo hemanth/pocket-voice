@@ -1,10 +1,10 @@
 // Pocket TTS ONNX Web Worker
 console.log("Pocket TTS Worker Starting...");
 
-// Load dependencies synchronously at top level — importScripts() fails inside async functions on mobile browsers
 const ORT_VERSION = "1.20.0";
 const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
-importScripts(`${ORT_CDN_BASE}ort.all.min.js`);
+
+// Load local dependency at top level (importScripts is synchronous, local file is fast)
 importScripts("./sentencepiece.js");
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
@@ -540,6 +540,19 @@ async function loadOrt() {
     }
 
     postMessage({ type: "status", status: "Loading ONNX Runtime...", state: "loading" });
+    // Fetch ORT script and load via Blob URL — avoids top-level importScripts crash on CDN failure
+    // and works reliably in async contexts across all browsers
+    const ortUrl = `${ORT_CDN_BASE}ort.all.min.js`;
+    const response = await fetch(ortUrl);
+    if (!response.ok) throw new Error(`Failed to load ONNX Runtime from CDN (${response.status})`);
+    const scriptText = await response.text();
+    const blob = new Blob([scriptText], { type: "application/javascript" });
+    const blobUrl = URL.createObjectURL(blob);
+    try {
+        importScripts(blobUrl);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
     ort = self.ort;
     ort.env.wasm.wasmPaths = ORT_CDN_BASE;
     ort.env.wasm.simd = true;
