@@ -92,7 +92,6 @@ class PocketVoice {
 
     this.setupOnScreenConsole();
     this.bindEvents();
-    this.buildGallery(); // Render gallery immediately — no waiting for worker
     this.init();
     this.setupWaveform();
     this.loadSavedVoices();
@@ -306,6 +305,7 @@ class PocketVoice {
 
       case "voices_loaded":
         this.builtinVoices = msg.voices || [];
+        this.buildGallery(this.builtinVoices);
         this.populateVoices(this.builtinVoices, msg.defaultVoice);
         this.updateGalleryActive();
         break;
@@ -334,7 +334,9 @@ class PocketVoice {
 
       case "voice_set":
         this.activeVoice = msg.voiceName;
+        this.activeSavedVoiceId = null;
         this.updateGalleryActive();
+        this.updateSavedVoicesActive();
         this.resetUI();
         break;
 
@@ -636,19 +638,22 @@ class PocketVoice {
 
   // ── Voice Gallery ──
 
-  buildGallery() {
+  buildGallery(voices = []) {
     this.el.voiceGallery.innerHTML = "";
 
-    for (const [v, persona] of Object.entries(VOICE_PERSONAS)) {
+    for (const v of voices) {
+      const persona = VOICE_PERSONAS[v];
       const card = document.createElement("div");
       card.className = "voice-card";
       card.dataset.voice = v;
 
       const initials = v.slice(0, 2).toUpperCase();
+      const label = persona ? persona.label : v.charAt(0).toUpperCase() + v.slice(1);
+      const desc = persona ? persona.desc : "";
       card.innerHTML = `
         <div class="voice-card__avatar">${initials}</div>
-        <div class="voice-card__name">${persona.label}</div>
-        <div class="voice-card__desc">${persona.desc}</div>
+        <div class="voice-card__name">${label}</div>
+        <div class="voice-card__desc">${desc}</div>
       `;
 
       card.addEventListener("click", () => {
