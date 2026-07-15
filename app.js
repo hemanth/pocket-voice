@@ -90,11 +90,100 @@ class PocketVoice {
       saveConfirm: document.getElementById("save-confirm"),
     };
 
+    this.setupOnScreenConsole();
     this.bindEvents();
     this.buildGallery(); // Render gallery immediately — no waiting for worker
     this.init();
     this.setupWaveform();
     this.loadSavedVoices();
+  }
+
+  setupOnScreenConsole() {
+    if (!window.location.search.includes("debug=1")) return;
+
+    const container = document.createElement("div");
+    container.id = "debug-console";
+    container.style.cssText = `
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 180px;
+      overflow-y: auto;
+      background: #0f141c;
+      color: #38bdf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      z-index: 99999;
+      border-top: 1px solid #1e293b;
+      padding: 10px;
+      box-sizing: border-box;
+      opacity: 0.95;
+      user-select: text;
+      -webkit-user-select: text;
+    `;
+    
+    const header = document.createElement("div");
+    header.style.cssText = "display: flex; justify-content: space-between; border-bottom: 1px solid #1e293b; padding-bottom: 4px; margin-bottom: 6px; font-weight: bold; color: #94a3b8;";
+    header.innerHTML = `<span>📱 Debug Logs (?debug=1)</span><button id="debug-clear" style="background: none; border: none; color: #f43f5e; cursor: pointer; font-size: 10px; font-family: inherit; padding: 0 4px;">Clear</button>`;
+    container.appendChild(header);
+
+    const logList = document.createElement("div");
+    logList.id = "debug-log-list";
+    container.appendChild(logList);
+    document.body.appendChild(container);
+
+    document.getElementById("debug-clear").addEventListener("click", () => {
+      logList.innerHTML = "";
+    });
+
+    const addLog = (msg, type = "info") => {
+      const item = document.createElement("div");
+      item.style.padding = "2px 0";
+      if (type === "error") {
+        item.style.color = "#f43f5e";
+        item.style.borderLeft = "2px solid #f43f5e";
+        item.style.paddingLeft = "4px";
+      } else if (type === "warn") {
+        item.style.color = "#f59e0b";
+      }
+      
+      const time = new Date().toLocaleTimeString([], { hour12: false, fractionSecondDigits: 3 });
+      item.textContent = `[${time}] ${msg}`;
+      logList.appendChild(item);
+      container.scrollTop = container.scrollHeight;
+    };
+
+    // Intercept console functions
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    console.log = (...args) => {
+      origLog.apply(console, args);
+      addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "), "info");
+    };
+    console.warn = (...args) => {
+      origWarn.apply(console, args);
+      addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "), "warn");
+    };
+    console.error = (...args) => {
+      origError.apply(console, args);
+      addLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "), "error");
+    };
+
+    // Global script errors
+    window.addEventListener("error", (e) => {
+      addLog(`Uncaught Error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`, "error");
+    });
+
+    // Unhandled promise rejections
+    window.addEventListener("unhandledrejection", (e) => {
+      addLog(`Unhandled Rejection: ${e.reason}`, "error");
+    });
+
+    addLog("Debug logger initialized successfully.");
   }
 
   bindEvents() {
@@ -178,6 +267,7 @@ class PocketVoice {
   }
 
   handleWorkerMessage(msg) {
+    console.log("[Worker Event] " + JSON.stringify(msg));
     switch (msg.type) {
       case "status":
         this.updateStatus(msg.status, msg.state);
