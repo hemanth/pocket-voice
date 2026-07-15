@@ -23,6 +23,15 @@ const MODEL_STEMS = {
 const DEBUG_LOGS = false;
 const CHUNK_GAP_SEC = 0.25;
 const MAX_FRAMES = 500;
+
+function checkIsIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function checkIsSafari() {
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
 const LSD_STEPS = 1;
 const RESET_FLOW_STATE_EACH_CHUNK = true;
 const RESET_MIMI_STATE_EACH_CHUNK = true;
@@ -554,18 +563,16 @@ async function loadOrt() {
         URL.revokeObjectURL(blobUrl);
     }
     ort.env.wasm.wasmPaths = ORT_CDN_BASE;
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isIOS || isSafari) {
-        console.log("iOS or Safari detected: disabling WebAssembly SIMD to prevent stack overflow.");
+    if (checkIsIOS() || checkIsSafari()) {
+        console.log("iOS or Safari detected: disabling WebAssembly SIMD and forcing 1 thread to prevent stack/memory limits.");
         ort.env.wasm.simd = false;
+        ort.env.wasm.numThreads = 1;
     } else {
         ort.env.wasm.simd = true;
+        ort.env.wasm.numThreads = self.crossOriginIsolated
+            ? Math.min(navigator.hardwareConcurrency || 4, 8)
+            : 1;
     }
-    ort.env.wasm.numThreads = self.crossOriginIsolated
-        ? Math.min(navigator.hardwareConcurrency || 4, 8)
-        : 1;
     precomputeFlowBuffers();
 }
 
@@ -615,13 +622,38 @@ async function loadBundle(language, { initialLoad = false } = {}) {
         graphOptimizationLevel: "all",
     };
 
-    const [encoderRes, textCondRes, flowMainRes, flowFlowRes, decoderRes] = await Promise.all([
-        ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_encoder), sessionOptions),
-        ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions),
-        ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions),
-        ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions),
-        ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions),
-    ]);
+    if (checkIsIOS() || checkIsSafari()) {
+        console.log("iOS or Safari detected: disabling CPU Memory Arena and Memory Pattern to optimize memory footprint.");
+        sessionOptions.enableCpuMemArena = false;
+        sessionOptions.enableMemPattern = false;
+    }
+
+    let encoderRes, textCondRes, flowMainRes, flowFlowRes, decoderRes;
+    if (checkIsIOS() || checkIsSafari()) {
+        postMessage({ type: "status", status: "Loading model 1/5...", state: "loading" });
+        encoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_encoder), sessionOptions);
+        postMessage({ type: "status", status: "Loading model 2/5...", state: "loading" });
+        textCondRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions);
+        postMessage({ type: "status", status: "Loading model 3/5...", state: "loading" });
+        flowMainRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions);
+        postMessage({ type: "status", status: "Loading model 4/5...", state: "loading" });
+        flowFlowRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions);
+        postMessage({ type: "status", status: "Loading model 5/5...", state: "loading" });
+        decoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions);
+    } else {
+        const results = await Promise.all([
+            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_encoder), sessionOptions),
+            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions),
+            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions),
+            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions),
+            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions),
+        ]);
+        encoderRes = results[0];
+        textCondRes = results[1];
+        flowMainRes = results[2];
+        flowFlowRes = results[3];
+        decoderRes = results[4];
+    }
 
     mimiEncoderSession = encoderRes;
     textConditionerSession = textCondRes;
