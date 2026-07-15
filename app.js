@@ -264,6 +264,20 @@ class PocketVoice {
 
   async ensureAudioContext() {
     if (this.audioContext) return;
+
+    // iOS Safari: unlock audio session so Web Audio plays even when the
+    // ringer/silent switch is on. Playing a tiny silent <audio> element
+    // elevates the session from "ambient" to "playback".
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      try {
+        const silence = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwLRAAAAAAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwLRAAAAAAAAAAAAAAAAAAAA");
+        silence.volume = 0.01;
+        await silence.play().catch(() => {});
+        silence.pause();
+        silence.remove();
+      } catch (_) {}
+    }
+
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: SAMPLE_RATE,
       latencyHint: "interactive",
