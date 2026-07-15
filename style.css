@@ -488,6 +488,16 @@ body {
   background: var(--accent-surface);
 }
 
+.gallery__grid.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.field__select:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .voice-card__avatar {
   width: 36px;
   height: 36px;

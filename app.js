@@ -236,6 +236,9 @@ class PocketVoice {
     this.el.btnGenerate.disabled = true;
     this.el.btnRecord.disabled = true;
     this.el.btnUpload.disabled = true;
+    this.el.voiceSelect.disabled = true;
+    this.el.langSelect.disabled = true;
+    this.el.voiceGallery.classList.add("is-disabled");
     this.setCloneStatus("Loading model… please wait", "");
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -596,10 +599,13 @@ class PocketVoice {
   }
 
   async loadSavedVoice(voice) {
+    if (!this.isWorkerReady || this.isGenerating) return;
     this.setCloneStatus(`Loading "${voice.name}"…`, "");
     this.isLoadingSavedVoice = true; // Suppress save-modal
     this.activeSavedVoiceId = voice.id; // Highlight this item
+    this.activeVoice = "custom";
     this.updateSavedVoicesActive();
+    this.updateGalleryActive(); // Clear built-in highlights
     this.lastClonedPCM = new Float32Array(voice.pcm);
     const pcmCopy = new Float32Array(voice.pcm);
     this.worker.postMessage({ type: "encode_voice", data: { audio: pcmCopy } }, [pcmCopy.buffer]);
@@ -646,9 +652,11 @@ class PocketVoice {
       `;
 
       card.addEventListener("click", () => {
-        if (this.isGenerating) return;
+        if (!this.isWorkerReady || this.isGenerating) return;
         this.el.voiceSelect.value = v;
         this.activeVoice = v;
+        this.activeSavedVoiceId = null;
+        this.updateSavedVoicesActive();
         this.worker.postMessage({ type: "set_voice", data: { voiceName: v } });
         this.updateGalleryActive();
       });
@@ -815,6 +823,9 @@ class PocketVoice {
     this.el.btnStop.style.display = "none";
     this.el.btnRecord.disabled = !this.isWorkerReady;
     this.el.btnUpload.disabled = !this.isWorkerReady;
+    this.el.voiceSelect.disabled = !this.isWorkerReady;
+    this.el.langSelect.disabled = !this.isWorkerReady;
+    this.el.voiceGallery.classList.toggle("is-disabled", !this.isWorkerReady);
   }
 
   updateStatus(text, state) {
