@@ -9,7 +9,7 @@ importScripts("./sentencepiece.js");
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
-let ort = null;
+// ort is declared by the ONNX Runtime library when loaded via importScripts in loadOrt()
 
 const DEFAULT_LANGUAGE = "english_2026-04";
 const LANGUAGE_BUNDLES = ["english_2026-04", "german", "italian", "portuguese", "spanish"];
@@ -535,7 +535,7 @@ function precomputeFlowBuffers() {
 }
 
 async function loadOrt() {
-    if (ort) {
+    if (typeof ort !== "undefined" && ort) {
         return;
     }
 
@@ -553,7 +553,6 @@ async function loadOrt() {
     } finally {
         URL.revokeObjectURL(blobUrl);
     }
-    ort = self.ort;
     ort.env.wasm.wasmPaths = ORT_CDN_BASE;
     ort.env.wasm.simd = true;
     ort.env.wasm.numThreads = self.crossOriginIsolated
