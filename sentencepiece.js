@@ -86,7 +86,14 @@ class SentencePieceProcessor {
     loadFromB64StringModel(b64model) {
         return __awaiter(this, void 0, void 0, function* () {
             // decode base64 string 
-            const model = Buffer.from(b64model, 'base64');
+            const model = Buffer$1.from(b64model, 'base64');
+            yield this._loadModel(model);
+        });
+    }
+    // load model from raw bytes (Uint8Array or ArrayBuffer) — avoids base64 roundtrip
+    loadFromArrayBuffer(buffer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const model = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
             yield this._loadModel(model);
         });
     }

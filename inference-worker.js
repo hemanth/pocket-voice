@@ -31,7 +31,7 @@ let currentLanguage = DEFAULT_LANGUAGE;
 let currentBundleDir = null;
 let bundleMetadata = null;
 let tokenizerProcessor = null;
-let tokenizerModelB64 = null;
+
 let bosBeforeVoice = null;
 
 let mimiEncoderSession = null;
@@ -627,15 +627,8 @@ async function loadBundle(language, { initialLoad = false } = {}) {
         throw new Error(`Failed to load tokenizer for ${language}`);
     }
     const tokenizerBuffer = await tokenizerResponse.arrayBuffer();
-    const bytes = new Uint8Array(tokenizerBuffer);
-    let binary = "";
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-    }
-    tokenizerModelB64 = btoa(binary);
     tokenizerProcessor = new self.SentencePieceProcessor();
-    await tokenizerProcessor.loadFromB64StringModel(tokenizerModelB64);
+    await tokenizerProcessor.loadFromArrayBuffer(tokenizerBuffer);
 
     bosBeforeVoice = null;
     if (bundleMetadata.bos_before_voice_file) {
