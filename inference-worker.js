@@ -535,8 +535,8 @@ async function loadOrt() {
     postMessage({ type: "status", status: "Loading ONNX Runtime...", state: "loading" });
     const version = "1.20.0";
     const cdnBase = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/`;
-    const ortModule = await import(`https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/ort.min.mjs`);
-    ort = ortModule.default || ortModule;
+    importScripts(`https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/ort.all.min.js`);
+    ort = self.ort;
     ort.env.wasm.wasmPaths = cdnBase;
     ort.env.wasm.simd = true;
     ort.env.wasm.numThreads = self.crossOriginIsolated
@@ -611,8 +611,8 @@ async function loadBundle(language, { initialLoad = false } = {}) {
     }
     const tokenizerBuffer = await tokenizerResponse.arrayBuffer();
     tokenizerModelB64 = btoa(String.fromCharCode(...new Uint8Array(tokenizerBuffer)));
-    const spModule = await import("./sentencepiece.js");
-    tokenizerProcessor = new spModule.SentencePieceProcessor();
+    importScripts("./sentencepiece.js");
+    tokenizerProcessor = new self.SentencePieceProcessor();
     await tokenizerProcessor.loadFromB64StringModel(tokenizerModelB64);
 
     bosBeforeVoice = null;

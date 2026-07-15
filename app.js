@@ -147,25 +147,33 @@ class PocketVoice {
     this.el.btnGenerate.disabled = true;
 
     try {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: SAMPLE_RATE,
-        latencyHint: "interactive",
-      });
-      this.player = new PCMPlayer(this.audioContext);
-      this.player.addEventListener("audioEnded", () => {
-        if (this.deferStreamEnd) {
-          this.deferStreamEnd = false;
-          this.finalizePlayback();
-        }
-      });
+      await this.ensureAudioContext();
     } catch (err) {
       this.updateStatus(`Audio error: ${err.message}`, "error");
       return;
     }
 
-    this.worker = new Worker("./inference-worker.js", { type: "module" });
+    this.worker = new Worker("./inference-worker.js");
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
     this.worker.postMessage({ type: "load" });
+  }
+
+  async ensureAudioContext() {
+    if (this.audioContext) return;
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: SAMPLE_RATE,
+      latencyHint: "interactive",
+    });
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
+    this.player = new PCMPlayer(this.audioContext);
+    this.player.addEventListener("audioEnded", () => {
+      if (this.deferStreamEnd) {
+        this.deferStreamEnd = false;
+        this.finalizePlayback();
+      }
+    });
   }
 
   handleWorkerMessage(msg) {
@@ -291,7 +299,11 @@ class PocketVoice {
   }
 
   getSupportedMime() {
-    const mimes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) || 
+                     /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const mimes = isSafari
+      ? ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
+      : ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
     for (const m of mimes) {
       if (MediaRecorder.isTypeSupported(m)) return m;
     }
@@ -308,6 +320,7 @@ class PocketVoice {
 
   async processVoiceClip(blob) {
     try {
+      await this.ensureAudioContext();
       this.setCloneStatus("Encoding voice…", "");
       const arrayBuffer = await blob.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
@@ -521,12 +534,13 @@ class PocketVoice {
 
   // ── Generation ──
 
-  generate() {
+  async generate() {
     if (!this.isWorkerReady || this.isGenerating) return;
     const text = this.el.textInput.value.trim();
     if (!text) return;
 
-    if (this.audioContext.state === "suspended") this.audioContext.resume();
+    await this.ensureAudioContext();
+    if (this.audioContext.state === "suspended") await this.audioContext.resume();
 
     this.isGenerating = true;
     this.generationStartTime = performance.now();
@@ -708,7 +722,7 @@ class PocketVoice {
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
@@ -720,7 +734,7 @@ class PocketVoice {
       const h = rect.height;
       ctx.clearRect(0, 0, w, h);
 
-      if (!this.player?.analyser) return;
+      if (!this.player?.analyser || !this.audioContext) return;
 
       const dataArray = this.player.getTimeDomainData();
       const len = dataArray.length;
