@@ -290,8 +290,14 @@ export class PCMPlayerWorklet extends EventEmitter {
     this.playbackTime = 0;
     this.pendingChunks = [];
     this.pendingStreamEnd = false;
-    this.availableCapacity = 0;
-    if (this.workletNode) this.workletNode.port.postMessage({ type: 'reset' });
+    if (this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'reset' });
+      this.workletNode.port.postMessage({ type: 'request-capacity' });
+    }
+    // After reset the worklet buffer is empty — bootstrap capacity so
+    // playAudio() can send chunks immediately without waiting for the
+    // round-trip capacity response.
+    this.availableCapacity = this.audioContext.sampleRate * 60 - 128;
     if (this.gainNode) {
       const now = this.audioContext.currentTime;
       this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
