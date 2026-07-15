@@ -1,5 +1,12 @@
 // Pocket TTS ONNX Web Worker
 console.log("Pocket TTS Worker Starting...");
+
+// Load dependencies synchronously at top level — importScripts() fails inside async functions on mobile browsers
+const ORT_VERSION = "1.20.0";
+const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
+importScripts(`${ORT_CDN_BASE}ort.all.min.js`);
+importScripts("./sentencepiece.js");
+
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
 let ort = null;
@@ -533,11 +540,8 @@ async function loadOrt() {
     }
 
     postMessage({ type: "status", status: "Loading ONNX Runtime...", state: "loading" });
-    const version = "1.20.0";
-    const cdnBase = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/`;
-    importScripts(`https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/ort.all.min.js`);
     ort = self.ort;
-    ort.env.wasm.wasmPaths = cdnBase;
+    ort.env.wasm.wasmPaths = ORT_CDN_BASE;
     ort.env.wasm.simd = true;
     ort.env.wasm.numThreads = self.crossOriginIsolated
         ? Math.min(navigator.hardwareConcurrency || 4, 8)
@@ -611,7 +615,6 @@ async function loadBundle(language, { initialLoad = false } = {}) {
     }
     const tokenizerBuffer = await tokenizerResponse.arrayBuffer();
     tokenizerModelB64 = btoa(String.fromCharCode(...new Uint8Array(tokenizerBuffer)));
-    importScripts("./sentencepiece.js");
     tokenizerProcessor = new self.SentencePieceProcessor();
     await tokenizerProcessor.loadFromB64StringModel(tokenizerModelB64);
 

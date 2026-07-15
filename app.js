@@ -146,13 +146,6 @@ class PocketVoice {
     this.updateStatus("Initializing…", "loading");
     this.el.btnGenerate.disabled = true;
 
-    try {
-      await this.ensureAudioContext();
-    } catch (err) {
-      this.updateStatus(`Audio error: ${err.message}`, "error");
-      return;
-    }
-
     this.worker = new Worker("./inference-worker.js");
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
     this.worker.postMessage({ type: "load" });
