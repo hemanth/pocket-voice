@@ -63,6 +63,7 @@ export class PCMPlayerWorklet extends EventEmitter {
                 case 'audio': this.addAudio(e.data.data); break;
                 case 'reset': this.reset(); break;
                 case 'stream-ended': this.streamEnded = true; break;
+                case 'request-capacity': this.sendCapacityUpdate(); break;
               }
             };
             this.sendCapacityUpdate();
@@ -202,6 +203,14 @@ export class PCMPlayerWorklet extends EventEmitter {
             break;
         }
       };
+
+      // The processor constructor sends an initial capacity message, but it arrives
+      // before port.onmessage is set above — so it's lost. Request a fresh one,
+      // and bootstrap capacity so playAudio() works immediately without waiting
+      // for the round-trip response.
+      this.workletNode.port.postMessage({ type: 'request-capacity' });
+      this.hasReceivedInitialCapacity = true;
+      this.availableCapacity = bufferSizeSamples - 128;
 
       this.isInitialized = true;
       this.isWorkletReady = true;
