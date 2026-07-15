@@ -614,7 +614,13 @@ async function loadBundle(language, { initialLoad = false } = {}) {
         throw new Error(`Failed to load tokenizer for ${language}`);
     }
     const tokenizerBuffer = await tokenizerResponse.arrayBuffer();
-    tokenizerModelB64 = btoa(String.fromCharCode(...new Uint8Array(tokenizerBuffer)));
+    const bytes = new Uint8Array(tokenizerBuffer);
+    let binary = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    tokenizerModelB64 = btoa(binary);
     tokenizerProcessor = new self.SentencePieceProcessor();
     await tokenizerProcessor.loadFromB64StringModel(tokenizerModelB64);
 
