@@ -5,7 +5,7 @@ const ORT_VERSION = "1.20.0";
 const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 
 // Load local dependency at top level (importScripts is synchronous, local file is fast)
-importScripts("./sentencepiece.js?v=2.0.2");
+importScripts("./sentencepiece.js?v=2.0.3");
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
@@ -409,7 +409,30 @@ function parseVoiceStatesBin(buffer) {
     return voices;
 }
 
+async function ensureEncoderSessionLoaded() {
+    if (mimiEncoderSession) {
+        return;
+    }
+    postMessage({ type: "status", status: "Loading voice encoder...", state: "loading" });
+    const sessionOptions = {
+        executionProviders: ["wasm"],
+        graphOptimizationLevel: "all",
+    };
+    if (checkIsIOS() || checkIsSafari()) {
+        console.log("iOS or Safari detected: disabling CPU Memory Arena, Memory Pattern, and Graph Optimizations for voice encoder.");
+        sessionOptions.enableCpuMemArena = false;
+        sessionOptions.enableMemPattern = false;
+        sessionOptions.graphOptimizationLevel = "disabled";
+    }
+    mimiEncoderSession = await ort.InferenceSession.create(
+        bundlePath(currentLanguage, MODEL_STEMS.mimi_encoder),
+        sessionOptions
+    );
+    postMessage({ type: "status", status: "Voice encoder ready", state: "idle" });
+}
+
 async function encodeVoiceAudio(audioData) {
+    await ensureEncoderSessionLoaded();
     const input = createTensor("float32", audioData, [1, 1, audioData.length]);
     const outputs = await mimiEncoderSession.run({ audio: input });
     const embeddings = outputs[mimiEncoderSession.outputNames[0]];
@@ -616,6 +639,11 @@ async function loadBundle(language, { initialLoad = false } = {}) {
         releaseSession(flowLmFlowSession),
         releaseSession(mimiDecoderSession),
     ]);
+    mimiEncoderSession = null;
+    textConditionerSession = null;
+    flowLmMainSession = null;
+    flowLmFlowSession = null;
+    mimiDecoderSession = null;
 
     const sessionOptions = {
         executionProviders: ["wasm"],
@@ -623,39 +651,35 @@ async function loadBundle(language, { initialLoad = false } = {}) {
     };
 
     if (checkIsIOS() || checkIsSafari()) {
-        console.log("iOS or Safari detected: disabling CPU Memory Arena and Memory Pattern to optimize memory footprint.");
+        console.log("iOS or Safari detected: disabling CPU Memory Arena, Memory Pattern, and Graph Optimizations to save memory.");
         sessionOptions.enableCpuMemArena = false;
         sessionOptions.enableMemPattern = false;
+        sessionOptions.graphOptimizationLevel = "disabled";
     }
 
-    let encoderRes, textCondRes, flowMainRes, flowFlowRes, decoderRes;
+    let textCondRes, flowMainRes, flowFlowRes, decoderRes;
     if (checkIsIOS() || checkIsSafari()) {
-        postMessage({ type: "status", status: "Loading model 1/5...", state: "loading" });
-        encoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_encoder), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 2/5...", state: "loading" });
+        postMessage({ type: "status", status: "Loading model 1/4...", state: "loading" });
         textCondRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 3/5...", state: "loading" });
+        postMessage({ type: "status", status: "Loading model 2/4...", state: "loading" });
         flowMainRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 4/5...", state: "loading" });
+        postMessage({ type: "status", status: "Loading model 3/4...", state: "loading" });
         flowFlowRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 5/5...", state: "loading" });
+        postMessage({ type: "status", status: "Loading model 4/4...", state: "loading" });
         decoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions);
     } else {
         const results = await Promise.all([
-            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_encoder), sessionOptions),
             ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions),
             ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions),
             ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions),
             ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions),
         ]);
-        encoderRes = results[0];
-        textCondRes = results[1];
-        flowMainRes = results[2];
-        flowFlowRes = results[3];
-        decoderRes = results[4];
+        textCondRes = results[0];
+        flowMainRes = results[1];
+        flowFlowRes = results[2];
+        decoderRes = results[3];
     }
 
-    mimiEncoderSession = encoderRes;
     textConditionerSession = textCondRes;
     flowLmMainSession = flowMainRes;
     flowLmFlowSession = flowFlowRes;
