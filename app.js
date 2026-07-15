@@ -145,6 +145,9 @@ class PocketVoice {
   async init() {
     this.updateStatus("Initializing…", "loading");
     this.el.btnGenerate.disabled = true;
+    this.el.btnRecord.disabled = true;
+    this.el.btnUpload.disabled = true;
+    this.setCloneStatus("Loading model… please wait", "");
 
     this.worker = new Worker("./inference-worker.js");
     this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
@@ -215,6 +218,9 @@ class PocketVoice {
 
       case "loaded":
         this.isWorkerReady = true;
+        this.el.btnRecord.disabled = false;
+        this.el.btnUpload.disabled = false;
+        this.setCloneStatus("", "");
         this.resetUI();
         break;
 
@@ -239,6 +245,11 @@ class PocketVoice {
   async toggleRecording() {
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.stopRecording();
+      return;
+    }
+
+    if (!this.isWorkerReady) {
+      this.setCloneStatus("Model still loading… please wait", "");
       return;
     }
 
@@ -306,6 +317,11 @@ class PocketVoice {
   async handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
+    if (!this.isWorkerReady) {
+      this.setCloneStatus("Model still loading… please wait", "");
+      e.target.value = "";
+      return;
+    }
     this.setCloneStatus(`Processing ${file.name}…`, "");
     await this.processVoiceClip(file);
     e.target.value = "";

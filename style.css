@@ -926,8 +926,7 @@ body {
 
 @media (max-width: 480px) {
   .hero__title { font-size: 2.4rem; }
-  .hero__actions { flex-direction: column; width: 100%; }
-  .hero__actions .btn-primary,
-  .hero__actions .btn-ghost { width: 100%; justify-content: center; }
+  .hero__actions { flex-direction: column; align-items: center; width: 100%; }
+  .hero__actions .btn-primary { padding: 0.6rem 1.2rem; font-size: 0.8rem; }
   .metrics { grid-template-columns: 1fr 1fr; }
 }
