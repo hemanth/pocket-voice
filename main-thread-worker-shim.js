@@ -40,15 +40,23 @@
 
       // Override postMessage so worker code's calls route back to app.js
       // Worker code calls: postMessage({type:'status', ...}) or self.postMessage(...)
+      // CRITICAL: Deliver synchronously (not via setTimeout) so audio chunks reach
+      // the AudioWorklet buffer immediately during the synchronous inference loop.
+      // If we used setTimeout, callbacks would be blocked until inference finishes.
       window.postMessage = function (msg, transferOrOrigin) {
         // Ignore standard cross-origin postMessage calls (string origin as 2nd arg)
         if (typeof transferOrOrigin === "string") {
           return shim._origPostMessage(msg, transferOrOrigin);
         }
-        // Queue or deliver to app.js
+        // When worker code passes transferables like [audioFloat32.buffer],
+        // we ignore them — on main thread there's no transfer, just shared memory.
+        // Deliver synchronously to app.js handler
         if (shim.onmessage) {
-          const handler = shim.onmessage;
-          setTimeout(() => handler({ data: msg }), 0);
+          try {
+            shim.onmessage({ data: msg });
+          } catch (e) {
+            console.error("[MainThreadWorkerShim] Handler error:", e);
+          }
         } else {
           shim._pendingOutbound.push(msg);
         }

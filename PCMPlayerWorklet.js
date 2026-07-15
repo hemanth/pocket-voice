@@ -179,9 +179,10 @@ export class PCMPlayerWorklet extends EventEmitter {
         registerProcessor('pcm-processor', PCMProcessor);
       `;
 
-      const base64 = btoa(unescape(encodeURIComponent(processorCode)));
-      const workletUrl = `data:application/javascript;base64,${base64}`;
+      const blob = new Blob([processorCode], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
       await this.audioContext.audioWorklet.addModule(workletUrl);
+      URL.revokeObjectURL(workletUrl);
 
       this.workletNode = new AudioWorkletNode(this.audioContext, 'pcm-processor');
       this.workletNode.connect(this.gainNode);
