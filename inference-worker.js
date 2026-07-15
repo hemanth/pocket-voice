@@ -5,7 +5,7 @@ const ORT_VERSION = "1.20.0";
 const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 
 // Load local dependency at top level (importScripts is synchronous, local file is fast)
-importScripts("./sentencepiece.js");
+importScripts("./sentencepiece.js?v=2.0.2");
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
