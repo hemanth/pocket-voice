@@ -5,7 +5,7 @@ const ORT_VERSION = "1.18.0";
 const ORT_CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
 
 // Load local dependency at top level (importScripts is synchronous, local file is fast)
-importScripts("./sentencepiece.js?v=2.0.4");
+importScripts("./sentencepiece.js?v=2.0.5");
 
 self.postMessage({ type: "status", status: "Worker Thread Started", state: "idle" });
 
@@ -659,25 +659,51 @@ async function loadBundle(language, { initialLoad = false } = {}) {
 
     let textCondRes, flowMainRes, flowFlowRes, decoderRes;
     if (checkIsIOS() || checkIsSafari()) {
-        postMessage({ type: "status", status: "Loading model 1/4...", state: "loading" });
-        textCondRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 2/4...", state: "loading" });
-        flowMainRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 3/4...", state: "loading" });
-        flowFlowRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions);
-        postMessage({ type: "status", status: "Loading model 4/4...", state: "loading" });
-        decoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions);
+        try {
+            postMessage({ type: "status", status: "Loading model 1/4...", state: "loading" });
+            textCondRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions);
+        } catch (e) {
+            throw new Error(`Failed to load model 1/4 (text_conditioner): ${e.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            postMessage({ type: "status", status: "Loading model 2/4...", state: "loading" });
+            flowMainRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions);
+        } catch (e) {
+            throw new Error(`Failed to load model 2/4 (flow_lm_main): ${e.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            postMessage({ type: "status", status: "Loading model 3/4...", state: "loading" });
+            flowFlowRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions);
+        } catch (e) {
+            throw new Error(`Failed to load model 3/4 (flow_lm_flow): ${e.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            postMessage({ type: "status", status: "Loading model 4/4...", state: "loading" });
+            decoderRes = await ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions);
+        } catch (e) {
+            throw new Error(`Failed to load model 4/4 (mimi_decoder): ${e.message}`);
+        }
     } else {
-        const results = await Promise.all([
-            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions),
-            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions),
-            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions),
-            ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions),
-        ]);
-        textCondRes = results[0];
-        flowMainRes = results[1];
-        flowFlowRes = results[2];
-        decoderRes = results[3];
+        try {
+            const results = await Promise.all([
+                ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.text_conditioner), sessionOptions),
+                ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_main), sessionOptions),
+                ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.flow_lm_flow), sessionOptions),
+                ort.InferenceSession.create(bundlePath(language, MODEL_STEMS.mimi_decoder), sessionOptions),
+            ]);
+            textCondRes = results[0];
+            flowMainRes = results[1];
+            flowFlowRes = results[2];
+            decoderRes = results[3];
+        } catch (e) {
+            throw new Error(`Failed parallel load of models: ${e.message}`);
+        }
     }
 
     textConditionerSession = textCondRes;
