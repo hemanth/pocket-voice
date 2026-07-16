@@ -232,16 +232,23 @@ export class PCMPlayerWorklet extends EventEmitter {
 
   processPendingChunks() {
     if (!this.isWorkletReady || this.pendingChunks.length === 0 || this.availableCapacity <= 0) return;
-    const chunk = this.pendingChunks[0];
-    if (chunk.length <= this.availableCapacity) {
-      this.pendingChunks.shift();
-      this.workletNode.port.postMessage({ type: 'audio', data: chunk });
-      this.availableCapacity = 0;
-    } else if (this.availableCapacity > 4096) {
-      const partial = chunk.slice(0, this.availableCapacity);
-      this.pendingChunks[0] = chunk.slice(this.availableCapacity);
-      this.workletNode.port.postMessage({ type: 'audio', data: partial });
-      this.availableCapacity = 0;
+    // Drain as many pending chunks as capacity allows. This is critical on
+    // iOS where inference blocks the main thread — we can't wait for
+    // round-trip capacity updates from the audio thread between chunks.
+    while (this.pendingChunks.length > 0 && this.availableCapacity > 0) {
+      const chunk = this.pendingChunks[0];
+      if (chunk.length <= this.availableCapacity) {
+        this.pendingChunks.shift();
+        this.workletNode.port.postMessage({ type: 'audio', data: chunk });
+        this.availableCapacity -= chunk.length;
+      } else if (this.availableCapacity > 4096) {
+        const partial = chunk.slice(0, this.availableCapacity);
+        this.pendingChunks[0] = chunk.slice(this.availableCapacity);
+        this.workletNode.port.postMessage({ type: 'audio', data: partial });
+        this.availableCapacity = 0;
+      } else {
+        break;
+      }
     }
     if (this.pendingChunks.length === 0 && this.pendingStreamEnd) {
       this.workletNode.port.postMessage({ type: 'stream-ended' });
