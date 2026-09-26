@@ -71,8 +71,15 @@
             xhr.open("GET", url, false); // synchronous
             xhr.send();
             if (xhr.status >= 200 && xhr.status < 300) {
-              // Indirect eval executes in global scope
-              (0, eval)(xhr.responseText);
+              // Run as an inline classic <script>: it executes synchronously,
+              // like importScripts, and its top-level `var`s become globals.
+              // Indirect eval does not work for strict-mode bundles:
+              // onnxruntime-web starts with "use strict"; var ort=…, and a
+              // strict eval keeps its vars private, so `ort` was never defined.
+              const el = document.createElement("script");
+              el.textContent = xhr.responseText + "\n//# sourceURL=" + url;
+              document.head.appendChild(el);
+              el.remove();
             } else {
               throw new Error(
                 `importScripts failed for ${url}: HTTP ${xhr.status}`
